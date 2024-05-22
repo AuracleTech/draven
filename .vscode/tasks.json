@@ -2,15 +2,23 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"type": "cargo",
-			"command": "run",
-			"args": ["--example", "example"],
-			"problemMatcher": ["$rustc"],
-			"label": "rust: cargo run",
+			"label": "run executable",
+			"type": "shell",
+			"command": "${workspaceFolder}/target/release/draven.exe",
+			"args": ["-o", "C:/Users/USER/Downloads/ObsidianAsh", "-i", "C:/Users/USER/Desktop/winit"],
+			"dependsOn": ["build executable"],
+			"problemMatcher": [],
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "build executable",
+			"type": "shell",
+			"command": "cargo build --release",
+			"group": "build",
+			"problemMatcher": ["$rustc"]
 		}
 	]
 }

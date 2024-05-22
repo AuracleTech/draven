@@ -1,10 +1,43 @@
 use std::io::Write;
+use std::{env, process};
 use std::{fs, path::Path};
 use syn::Item;
 
-pub fn structures_to_obsidian(src: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
-    fs::create_dir_all(output)?;
-    traverse_directory(src, output)
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() != 5 {
+        panic!("Usage: {} -o OUTPUT_FOLDER -i INPUT_FOLDER", args[0]);
+    }
+
+    let mut output = String::new();
+    let mut input = String::new();
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "-o" => {
+                if let Some(folder) = iter.next() {
+                    output = folder.clone();
+                } else {
+                    eprintln!("Expected argument after -o");
+                    process::exit(1);
+                }
+            }
+            "-i" => {
+                if let Some(folder) = iter.next() {
+                    input = folder.clone();
+                } else {
+                    eprintln!("Expected argument after -i");
+                    process::exit(1);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fs::create_dir_all(&output)?;
+    traverse_directory(input, &output)
 }
 
 fn traverse_directory<P: AsRef<Path>>(
