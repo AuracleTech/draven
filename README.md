@@ -2,7 +2,7 @@
 
 draven parses structures of a rust project into obsidian vault graph files 🌟
 
-![rustc compiler output](./preview.gif)
+![rustc compiler output](./preview.webp)
 
 ##### Usage
 
