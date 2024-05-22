@@ -5,6 +5,8 @@ edition = "2021"
 description = "draven parses structures of a rust project into obsidian vault graph files"
 repository = "https://github.com/AuracleTech/draven"
 license = "MIT"
+keywords = ["cli", "draven", "obsidian", "graph"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 quote = "1.0.36"
