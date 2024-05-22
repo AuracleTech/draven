@@ -7,7 +7,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 5 {
-        panic!("Usage: {} -o OUTPUT_FOLDER -i INPUT_FOLDER", args[0]);
+        eprintln!("Usage: cargo run -- -i <input_folder> -o <output_folder>");
+        process::exit(1);
     }
 
     let mut output = String::new();
