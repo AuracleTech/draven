@@ -1,6 +1,6 @@
 # draven
 
-draven is a tool that parses structures of a rust project into obsidian vault graph files 🌟
+draven parses structures of a rust project into obsidian vault graph files 🌟
 
 ![rustc compiler output](./preview.gif)
 

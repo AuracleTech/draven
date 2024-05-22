@@ -2,6 +2,7 @@
 name = "draven"
 version = "1.0.0"
 edition = "2021"
+description = "draven parses structures of a rust project into obsidian vault graph files"
 repository = "https://github.com/AuracleTech/draven"
 license = "MIT"
 
