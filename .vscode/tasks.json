@@ -5,7 +5,12 @@
 			"label": "run executable",
 			"type": "shell",
 			"command": "${workspaceFolder}/target/release/draven.exe",
-			"args": ["-o", "C:/Users/USER/Downloads/ObsidianAsh", "-i", "C:/Users/USER/Desktop/winit"],
+			"args": [
+				"-o",
+				"C:/Users/USER/Downloads/MyObsidianVault",
+				"-i",
+				"C:/Users/USER/Desktop/winit"
+			],
 			"dependsOn": ["build executable"],
 			"problemMatcher": [],
 			"group": {
@@ -15,8 +20,9 @@
 		},
 		{
 			"label": "build executable",
-			"type": "shell",
-			"command": "cargo build --release",
+			"type": "cargo",
+			"command": "build",
+			"args": ["--release"],
 			"group": "build",
 			"problemMatcher": ["$rustc"]
 		}
