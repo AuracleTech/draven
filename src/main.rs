@@ -140,11 +140,11 @@ fn clean_markdown_in_directory<P: AsRef<Path>>(
     for entry in fs::read_dir(output_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.is_dir() {
-            clean_markdown_in_directory(&path)?;
-        } else if let Some(extension) = path.extension() {
-            if extension == "md" {
-                fs::remove_file(&path)?;
+        if path.is_file() {
+            if let Some(extension) = path.extension() {
+                if extension == "md" {
+                    fs::remove_file(&path)?;
+                }
             }
         }
     }
