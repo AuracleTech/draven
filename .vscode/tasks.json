@@ -4,13 +4,8 @@
 		{
 			"label": "run executable",
 			"type": "shell",
-			"command": "${workspaceFolder}/target/release/draven.exe",
-			"args": [
-				"-o",
-				"C:/Users/USER/Downloads/MyObsidianVault",
-				"-i",
-				"C:/Users/USER/Desktop/winit"
-			],
+			"command": "${workspaceFolder}\\target\\release\\draven.exe",
+			"args": ["-i", "C:/Users/DREAD/Desktop/nhope/src", "-o", "C:/Users/DREAD/Downloads/Viktor"],
 			"dependsOn": ["build executable"],
 			"problemMatcher": [],
 			"group": {
