@@ -1,6 +1,6 @@
 [package]
 name = "draven"
-version = "1.0.2"
+version = "2.0.0"
 edition = "2021"
 description = "draven parses structures of a rust project into obsidian vault graph files"
 repository = "https://github.com/AuracleTech/draven"
@@ -9,5 +9,6 @@ keywords = ["cli", "draven", "obsidian", "graph"]
 categories = ["command-line-utilities"]
 
 [dependencies]
+notify = "6.1.1"
 quote = "1.0.36"
 syn = { version = "2.0.65", features = ["full"] }
