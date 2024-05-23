@@ -13,7 +13,7 @@ cargo install draven
 ##### Usage
 
 ```bash
-draven -w -i "path/to/rust_project" -o "path/to/an_obsidian_vault"
+draven -w -i "path/to/rust_project_src" -o "path/to/an_obsidian_vault"
 ```
 
 - `-w` Watches for file change in input folder
