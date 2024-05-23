@@ -8,8 +8,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let args = &args[1..];
 
-    let mut output = String::new();
-    let mut input = String::new();
+    let mut output_dir = String::new();
+    let mut src_dir = String::new();
     let mut watching = false;
     let mut silent = false;
 
@@ -18,7 +18,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         match arg.as_str() {
             "-i" | "-input" | "--input" => {
                 if let Some(folder) = iter.next() {
-                    input = verify_folder(folder.clone());
+                    src_dir = verify_folder(folder.clone());
                 } else {
                     eprintln!("Expected argument after -i");
                     process::exit(1);
@@ -26,7 +26,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "-o" | "-output" | "--output" => {
                 if let Some(folder) = iter.next() {
-                    output = verify_folder(folder.clone());
+                    output_dir = verify_folder(folder.clone());
                 } else {
                     eprintln!("Expected argument after -o");
                     process::exit(1);
@@ -34,7 +34,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "-h" | "-help" | "--help" => {
                 eprintln!("Usage: draven -i <input_folder> -o <output_folder>");
-                eprintln!("-w: Watch for changes in input folder");
+                eprintln!("-w:  Watches for file change in input folder");
                 eprintln!("-h: Display help message");
                 eprintln!("-o: Output folder to write markdown files to");
                 eprintln!("-i: Input folder to get rust project from");
@@ -50,34 +50,35 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    if input.is_empty() {
+    if src_dir.is_empty() {
         eprintln!("Input folder required");
         eprintln!("Help: draven -help");
         process::exit(1);
     }
 
-    if output.is_empty() {
+    if output_dir.is_empty() {
         eprintln!("Output folder required");
         eprintln!("Help: draven -help");
         process::exit(1);
     }
 
+    fs::create_dir_all(&output_dir)?;
+    clean_markdown_in_directory(&output_dir)?;
+    traverse_directory(&src_dir, &output_dir)?;
+    if !silent {
+        println!("Markdown files generated");
+    }
+
     if watching {
         loop {
-            if let Err(error) = watch(&input, &output, silent) {
+            if let Err(error) = watch(&src_dir, &output_dir, silent) {
                 eprintln!("Error: {:?}", error);
                 std::process::exit(1);
             }
         }
-    } else {
-        fs::create_dir_all(&output)?;
-        clean_markdown_in_directory(&output)?;
-        traverse_directory(input, &output)?;
-        if !silent {
-            println!("Markdown files generated");
-        }
-        Ok(())
     }
+
+    Ok(())
 }
 
 fn verify_folder(folder: String) -> String {
@@ -94,17 +95,17 @@ fn verify_folder(folder: String) -> String {
 }
 
 fn watch<P: AsRef<Path>>(
-    input: P,
-    output: &str,
+    src_dir: P,
+    output_dir: &str,
     silent: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) = std::sync::mpsc::channel();
 
     let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
-    watcher.watch(input.as_ref(), RecursiveMode::Recursive)?;
+    watcher.watch(src_dir.as_ref(), RecursiveMode::Recursive)?;
 
     if !silent {
-        println!("Watching for changes in {:?}...", input.as_ref());
+        println!("Watching for changes in {:?}...", src_dir.as_ref());
     }
 
     for res in rx {
@@ -116,9 +117,9 @@ fn watch<P: AsRef<Path>>(
                             if !silent {
                                 println!("Regenerating markdown files...");
                             }
-                            fs::create_dir_all(&output)?;
-                            clean_markdown_in_directory(&output)?;
-                            return traverse_directory(input, &output);
+                            fs::create_dir_all(&output_dir)?;
+                            clean_markdown_in_directory(&output_dir)?;
+                            return traverse_directory(src_dir, &output_dir);
                         }
                     }
                 }
