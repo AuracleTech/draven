@@ -35,9 +35,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             "-h" | "-help" | "--help" => {
                 eprintln!("Usage: draven -i <input_folder> -o <output_folder>");
                 eprintln!("-w: Watch for changes in input folder");
-                eprintln!("-h: Display this help message");
-                eprintln!("-o: Output folder to write markdown files");
-                eprintln!("-i: Input folder to watch");
+                eprintln!("-h: Display help message");
+                eprintln!("-o: Output folder to write markdown files to");
+                eprintln!("-i: Input folder to get rust project from");
                 eprintln!("-s: Silent mode");
                 process::exit(1);
             }
@@ -190,7 +190,6 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                         .as_ref()
                         .map(|ident| ident.to_string())
                         .unwrap_or_else(|| "unnamed_field".to_string());
-                    // TEST let type_name = type_path.path.segments.last().unwrap().ident.to_string(); // Replace unwrap
                     let type_name = type_path
                         .path
                         .segments
