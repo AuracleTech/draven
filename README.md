@@ -16,8 +16,9 @@ cargo install draven
 draven -w -i "path/to/rust_project_src" -o "path/to/an_obsidian_vault"
 ```
 
-- `-w` Watches for file change in input folder
-- `-h` Display help message
-- `-o <folder>` location to write markdown files to
 - `-i <folder>` location to get rust project from
-- `-s` Silent mode
+- `-o <folder>` location to write markdown files to
+- `-h` Display help message
+- `-w` Watches for file change in input folder
+- `-p` Enable linking primitive types in markdown files
+- `-s` Silent mode");

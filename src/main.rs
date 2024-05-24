@@ -9,7 +9,7 @@ use syn::{Item, ItemUse, UseTree};
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     let (mut src_dir, mut output_dir) = (String::new(), String::new());
-    let (mut watching, mut silent) = (false, false);
+    let (mut watching, mut silent, mut primitives) = (false, false, false);
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -18,6 +18,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             "-o" | "-output" | "--output" => output_dir = verify_folder(iter.next(), "-o")?,
             "-h" | "-help" | "--help" => print_help(),
             "-w" | "-watch" | "--watch" => watching = true,
+            "-p" | "-primitives" | "--primitives" => primitives = true,
             "-s" | "-silent" | "--silent" => silent = true,
             _ => Err(format!("Unknown argument: {}", arg))?,
         }
@@ -27,11 +28,11 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output_dir = PathBuf::from(output_dir);
     output_dir.push("draven_generated");
 
-    work(&src_dir, &output_dir, silent)?;
+    work(&src_dir, &output_dir, silent, primitives)?;
 
     if watching {
         loop {
-            watch(&src_dir, &output_dir, silent)?
+            watch(&src_dir, &output_dir, silent, primitives)?;
         }
     }
 
@@ -40,10 +41,11 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn print_help() {
     println!("Usage: draven -i <input_folder> -o <output_folder>");
-    println!("-w:  Watches for file change in input folder");
-    println!("-h: Display help message");
-    println!("-o <folder>: location to write markdown files to");
     println!("-i <folder>: location to get rust project from");
+    println!("-o <folder>: location to write markdown files to");
+    println!("-h: Display help message");
+    println!("-w: Watches for file change in input folder");
+    println!("-p: Enable linking primitive types in markdown files");
     println!("-s: Silent mode");
     process::exit(0);
 }
@@ -52,12 +54,13 @@ fn work<P: AsRef<Path>>(
     src_dir: P,
     output_dir: &PathBuf,
     silent: bool,
+    primitives: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if output_dir.exists() {
         fs::remove_dir_all(output_dir)?;
     }
     fs::create_dir_all(output_dir)?;
-    traverse_directory(&src_dir, output_dir)?;
+    traverse_directory(&src_dir, output_dir, primitives)?;
     if !silent {
         println!("Markdown files generated");
     }
@@ -83,6 +86,7 @@ fn watch<P: AsRef<Path>>(
     src_dir: P,
     output_dir: &PathBuf,
     silent: bool,
+    primitives: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) = std::sync::mpsc::channel();
 
@@ -99,7 +103,7 @@ fn watch<P: AsRef<Path>>(
                 if let Some(path) = event.paths.first() {
                     if let Some(extension) = path.extension() {
                         if extension == "rs" {
-                            return work(&src_dir, output_dir, silent);
+                            return work(&src_dir, output_dir, silent, primitives);
                         }
                     }
                 }
@@ -114,15 +118,16 @@ fn watch<P: AsRef<Path>>(
 fn traverse_directory<P: AsRef<Path>>(
     src_dir: P,
     output_dir: &PathBuf,
+    primitives: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for entry in fs::read_dir(src_dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            traverse_directory(&path, output_dir)?;
+            traverse_directory(&path, output_dir, primitives)?;
         } else if let Some(extension) = path.extension() {
             if extension == "rs" {
-                parse_and_convert_to_markdown(&path, output_dir)?
+                parse_and_convert_to_markdown(&path, output_dir, primitives)?;
             }
         }
     }
@@ -132,6 +137,7 @@ fn traverse_directory<P: AsRef<Path>>(
 fn parse_and_convert_to_markdown<P: AsRef<Path>>(
     path: P,
     output_dir: &Path,
+    primitives: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let content = fs::read_to_string(&path)?;
     let syntax_res = syn::parse_file(&content);
@@ -159,7 +165,16 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                     .map(|ident| ident.to_string())
                     .unwrap_or_else(|| "unnamed_field".to_string());
                 let type_name = resolve_full_type_path(&field.ty, &import_map);
-                markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_name));
+                let formatted_type_name = if primitives {
+                    format!("[[{}]]", type_name)
+                } else {
+                    if is_primitive_type(&type_name) {
+                        type_name
+                    } else {
+                        format!("[[{}]]", type_name)
+                    }
+                };
+                markdown.push_str(&format!("{} : {}\n", field_name, formatted_type_name));
             }
 
             let output_file = output_dir.join(format!("{}.md", struct_name));
@@ -168,6 +183,28 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
         }
     }
     Ok(())
+}
+
+fn is_primitive_type(type_name: &str) -> bool {
+    matches!(
+        type_name,
+        "i8" | "i16"
+            | "i32"
+            | "i64"
+            | "i128"
+            | "u8"
+            | "u16"
+            | "u32"
+            | "u64"
+            | "u128"
+            | "isize"
+            | "usize"
+            | "f32"
+            | "f64"
+            | "bool"
+            | "char"
+            | "str"
+    )
 }
 
 fn parse_use_tree(tree: &UseTree, import_map: &mut HashMap<String, String>, prefix: String) {
