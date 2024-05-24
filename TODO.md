@@ -1,3 +1,3 @@
 # TODO
 
-- Add module name before structure names
+- Display inner type only for Vector, etc
