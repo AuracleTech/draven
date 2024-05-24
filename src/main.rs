@@ -13,31 +13,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
-            "-i" | "-input" | "--input" => {
-                if let Some(folder) = iter.next() {
-                    src_dir = verify_folder(folder.clone());
-                } else {
-                    eprintln!("Expected argument after -i");
-                    process::exit(1);
-                }
-            }
-            "-o" | "-output" | "--output" => {
-                if let Some(folder) = iter.next() {
-                    output_dir = verify_folder(folder.clone());
-                } else {
-                    eprintln!("Expected argument after -o");
-                    process::exit(1);
-                }
-            }
-            "-h" | "-help" | "--help" => {
-                eprintln!("Usage: draven -i <input_folder> -o <output_folder>");
-                eprintln!("-w:  Watches for file change in input folder");
-                eprintln!("-h: Display help message");
-                eprintln!("-o <folder>: location to write markdown files to");
-                eprintln!("-i <folder>: location to get rust project from");
-                eprintln!("-s: Silent mode");
-                process::exit(1);
-            }
+            "-h" | "-help" | "--help" => print_help(),
             "-w" | "-watch" | "--watch" => watching = true,
             "-s" | "-silent" | "--silent" => silent = true,
             _ => Err(format!("Unknown argument: {}", arg))?,
@@ -79,17 +55,16 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn verify_folder(folder: String) -> String {
-    let path = Path::new(&folder);
-    if !path.exists() {
-        eprintln!("Folder {:?} does not exist", path);
-        process::exit(1);
-    }
-    if !path.is_dir() {
-        eprintln!("{:?} is not a folder", path);
-        process::exit(1);
-    }
-    folder
+fn print_help() {
+    println!("Usage: draven -i <input_folder> -o <output_folder>");
+    println!("-w:  Watches for file change in input folder");
+    println!("-h: Display help message");
+    println!("-o <folder>: location to write markdown files to");
+    println!("-i <folder>: location to get rust project from");
+    println!("-s: Silent mode");
+    process::exit(0);
+}
+
 }
 
 fn watch<P: AsRef<Path>>(
