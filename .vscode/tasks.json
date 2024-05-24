@@ -5,7 +5,13 @@
 			"label": "run executable",
 			"type": "shell",
 			"command": "${workspaceFolder}\\target\\release\\draven.exe",
-			"args": ["-i", "C:/Users/DREAD/Desktop/nhope/src", "-o", "C:/Users/DREAD/Downloads/Viktor"],
+			"args": [
+				"-w",
+				"-i",
+				"C:/Users/DREAD/Desktop/nhope/src",
+				"-o",
+				"C:/Users/DREAD/Downloads/Viktor"
+			],
 			"dependsOn": ["build executable"],
 			"problemMatcher": [],
 			"group": {
