@@ -21,4 +21,4 @@ draven -w -i "path/to/rust_project_src" -o "path/to/an_obsidian_vault"
 - `-h` Display help message
 - `-w` Watches for file change in input folder
 - `-p` Enable linking primitive types in markdown files
-- `-s` Silent mode");
+- `-s` Silent mode
