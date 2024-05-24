@@ -145,7 +145,7 @@ fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) 
                         full_path.push_str("::");
                         full_path.push_str(&segment.ident.to_string());
                         if let syn::PathArguments::AngleBracketed(ref args) = segment.arguments {
-                            full_path.push_str("<");
+                            full_path.push('<');
                             for (i, arg) in args.args.iter().enumerate() {
                                 if let syn::GenericArgument::Type(ref generic_ty) = arg {
                                     if i > 0 {
@@ -155,7 +155,7 @@ fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) 
                                         .push_str(&resolve_full_type_path(generic_ty, import_map));
                                 }
                             }
-                            full_path.push_str(">");
+                            full_path.push('>');
                         }
                     }
                     return full_path;
@@ -184,7 +184,7 @@ fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) 
                 .join("::")
         }
         syn::Type::Array(type_array) => {
-            format!("{}", resolve_full_type_path(&type_array.elem, import_map))
+            resolve_full_type_path(&type_array.elem, import_map).to_string()
         }
         syn::Type::Reference(type_reference) => {
             let mut ref_str = String::new();
@@ -200,17 +200,14 @@ fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) 
             ref_str
         }
         syn::Type::Slice(type_slice) => {
-            format!("{}", resolve_full_type_path(&type_slice.elem, import_map))
+            resolve_full_type_path(&type_slice.elem, import_map).to_string()
         }
-        syn::Type::Tuple(type_tuple) => format!(
-            "{}",
-            type_tuple
+        syn::Type::Tuple(type_tuple) => type_tuple
                 .elems
                 .iter()
                 .map(|elem| resolve_full_type_path(elem, import_map))
                 .collect::<Vec<_>>()
-                .join(", ")
-        ),
+                .join(", ").to_string(),
         _ => "unknown".to_string(),
     }
 }
@@ -248,16 +245,12 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                 let type_name = resolve_full_type_path(&field.ty, &import_map);
                 let formatted_type_name = if type_name.contains('[') || type_name.contains(']') {
                     type_name
+                } else if primitives {
+                    format!("[[{}]]", type_name)
+                } else if is_primitive_type(&type_name) {
+                    type_name
                 } else {
-                    if primitives {
-                        format!("[[{}]]", type_name)
-                    } else {
-                        if is_primitive_type(&type_name) {
-                            type_name
-                        } else {
-                            format!("[[{}]]", type_name)
-                        }
-                    }
+                    format!("[[{}]]", type_name)
                 };
                 markdown.push_str(&format!("{} : {}\n", field_name, formatted_type_name));
             }
