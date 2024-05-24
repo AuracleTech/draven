@@ -40,11 +40,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "-w" | "-watch" | "--watch" => watching = true,
             "-s" | "-silent" | "--silent" => silent = true,
-            _ => {
-                eprintln!("Unknown argument: {}", arg);
-                process::exit(1);
-            }
-        }
+            _ => Err(format!("Unknown argument: {}", arg))?,
     }
 
     if src_dir.is_empty() {
