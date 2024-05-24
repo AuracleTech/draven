@@ -133,6 +133,87 @@ fn traverse_directory<P: AsRef<Path>>(
     }
     Ok(())
 }
+fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) -> String {
+    match ty {
+        syn::Type::Path(type_path) => {
+            let segments = &type_path.path.segments;
+            let mut full_path = String::new();
+            if let Some(first_segment) = segments.first() {
+                if let Some(mapped_path) = import_map.get(&first_segment.ident.to_string()) {
+                    full_path.push_str(mapped_path);
+                    for segment in segments.iter().skip(1) {
+                        full_path.push_str("::");
+                        full_path.push_str(&segment.ident.to_string());
+                        if let syn::PathArguments::AngleBracketed(ref args) = segment.arguments {
+                            full_path.push_str("<");
+                            for (i, arg) in args.args.iter().enumerate() {
+                                if let syn::GenericArgument::Type(ref generic_ty) = arg {
+                                    if i > 0 {
+                                        full_path.push_str(", ");
+                                    }
+                                    full_path
+                                        .push_str(&resolve_full_type_path(generic_ty, import_map));
+                                }
+                            }
+                            full_path.push_str(">");
+                        }
+                    }
+                    return full_path;
+                }
+            }
+            segments
+                .iter()
+                .map(|segment| {
+                    let mut segment_str = segment.ident.to_string();
+                    if let syn::PathArguments::AngleBracketed(ref args) = segment.arguments {
+                        segment_str.push_str("<[[");
+                        for (i, arg) in args.args.iter().enumerate() {
+                            if let syn::GenericArgument::Type(ref generic_ty) = arg {
+                                if i > 0 {
+                                    segment_str.push_str(", ");
+                                }
+                                segment_str
+                                    .push_str(&resolve_full_type_path(generic_ty, import_map));
+                            }
+                        }
+                        segment_str.push_str("]]>");
+                    }
+                    segment_str
+                })
+                .collect::<Vec<_>>()
+                .join("::")
+        }
+        syn::Type::Array(type_array) => {
+            format!("{}", resolve_full_type_path(&type_array.elem, import_map))
+        }
+        syn::Type::Reference(type_reference) => {
+            let mut ref_str = String::new();
+            if let Some(lifetime) = &type_reference.lifetime {
+                ref_str.push_str(&lifetime.to_string());
+                ref_str.push(' ');
+            }
+            ref_str.push('&');
+            if type_reference.mutability.is_some() {
+                ref_str.push_str("mut ");
+            }
+            ref_str.push_str(&resolve_full_type_path(&type_reference.elem, import_map));
+            ref_str
+        }
+        syn::Type::Slice(type_slice) => {
+            format!("{}", resolve_full_type_path(&type_slice.elem, import_map))
+        }
+        syn::Type::Tuple(type_tuple) => format!(
+            "{}",
+            type_tuple
+                .elems
+                .iter()
+                .map(|elem| resolve_full_type_path(elem, import_map))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        _ => "unknown".to_string(),
+    }
+}
 
 fn parse_and_convert_to_markdown<P: AsRef<Path>>(
     path: P,
@@ -165,13 +246,17 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                     .map(|ident| ident.to_string())
                     .unwrap_or_else(|| "unnamed_field".to_string());
                 let type_name = resolve_full_type_path(&field.ty, &import_map);
-                let formatted_type_name = if primitives {
-                    format!("[[{}]]", type_name)
+                let formatted_type_name = if type_name.contains('[') || type_name.contains(']') {
+                    type_name
                 } else {
-                    if is_primitive_type(&type_name) {
-                        type_name
-                    } else {
+                    if primitives {
                         format!("[[{}]]", type_name)
+                    } else {
+                        if is_primitive_type(&type_name) {
+                            type_name
+                        } else {
+                            format!("[[{}]]", type_name)
+                        }
                     }
                 };
                 markdown.push_str(&format!("{} : {}\n", field_name, formatted_type_name));
@@ -239,43 +324,5 @@ fn parse_use_tree(tree: &UseTree, import_map: &mut HashMap<String, String>, pref
                 parse_use_tree(tree, import_map, prefix.clone());
             }
         }
-    }
-}
-
-fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) -> String {
-    match ty {
-        syn::Type::Path(type_path) => {
-            let segments = &type_path.path.segments;
-            if let Some(first_segment) = segments.first() {
-                if let Some(full_path) = import_map.get(&first_segment.ident.to_string()) {
-                    return format!(
-                        "{}{}",
-                        full_path,
-                        segments
-                            .iter()
-                            .skip(1)
-                            .map(|segment| format!("::{}", segment.ident))
-                            .collect::<String>()
-                    );
-                }
-            }
-            segments
-                .iter()
-                .map(|segment| segment.ident.to_string())
-                .collect::<Vec<_>>()
-                .join("::")
-        }
-        syn::Type::Array(type_array) => resolve_full_type_path(&type_array.elem, import_map),
-        syn::Type::Reference(type_reference) => {
-            resolve_full_type_path(&type_reference.elem, import_map)
-        }
-        syn::Type::Slice(type_slice) => resolve_full_type_path(&type_slice.elem, import_map),
-        syn::Type::Tuple(type_tuple) => type_tuple
-            .elems
-            .iter()
-            .map(|elem| resolve_full_type_path(elem, import_map))
-            .collect::<Vec<_>>()
-            .join(", "),
-        _ => "unknown".to_string(),
     }
 }
