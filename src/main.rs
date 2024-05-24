@@ -13,6 +13,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
+            "-i" | "-input" | "--input" => src_dir = verify_folder(iter.next(), "-i")?,
+            "-o" | "-output" | "--output" => output_dir = verify_folder(iter.next(), "-o")?,
             "-h" | "-help" | "--help" => print_help(),
             "-w" | "-watch" | "--watch" => watching = true,
             "-s" | "-silent" | "--silent" => silent = true,
@@ -65,6 +67,19 @@ fn print_help() {
     process::exit(0);
 }
 
+fn verify_folder(
+    folder: Option<&String>,
+    flag: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    if let Some(folder) = folder {
+        let path = Path::new(folder);
+        if path.exists() && path.is_dir() {
+            return Ok(folder.clone());
+        }
+        Err(format!("{:?} is not a valid folder", path).into())
+    } else {
+        Err(format!("Expected argument after {}", flag).into())
+    }
 }
 
 fn watch<P: AsRef<Path>>(
