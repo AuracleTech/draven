@@ -6,6 +6,7 @@ use std::{fs, path::Path};
 use syn::Item;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().skip(1).collect();
     let (mut src_dir, mut output_dir) = (String::new(), String::new());
     let (mut watching, mut silent) = (false, false);
 
