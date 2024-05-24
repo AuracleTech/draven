@@ -6,13 +6,8 @@ use std::{fs, path::Path};
 use syn::Item;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    let args = &args[1..];
-
-    let mut output_dir = String::new();
-    let mut src_dir = String::new();
-    let mut watching = false;
-    let mut silent = false;
+    let (mut src_dir, mut output_dir) = (String::new(), String::new());
+    let (mut watching, mut silent) = (false, false);
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
