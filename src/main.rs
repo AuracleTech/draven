@@ -36,8 +36,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("Usage: draven -i <input_folder> -o <output_folder>");
                 eprintln!("-w:  Watches for file change in input folder");
                 eprintln!("-h: Display help message");
-                eprintln!("-o: Output folder to write markdown files to");
-                eprintln!("-i: Input folder to get rust project from");
+                eprintln!("-o <folder>: location to write markdown files to");
+                eprintln!("-i <folder>: location to get rust project from");
                 eprintln!("-s: Silent mode");
                 process::exit(1);
             }

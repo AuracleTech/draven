@@ -18,6 +18,6 @@ draven -w -i "path/to/rust_project_src" -o "path/to/an_obsidian_vault"
 
 - `-w` Watches for file change in input folder
 - `-h` Display help message
-- `-o` Output folder to write markdown files to
-- `-i` Input folder to get rust project from
+- `-o <folder>` location to write markdown files to
+- `-i <folder>` location to get rust project from
 - `-s` Silent mode
