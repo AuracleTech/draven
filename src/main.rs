@@ -19,38 +19,18 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             "-w" | "-watch" | "--watch" => watching = true,
             "-s" | "-silent" | "--silent" => silent = true,
             _ => Err(format!("Unknown argument: {}", arg))?,
-    }
-
-    if src_dir.is_empty() {
-        eprintln!("Input folder required");
-        eprintln!("Help: draven -help");
-        process::exit(1);
-    }
-
-    if output_dir.is_empty() {
-        eprintln!("Output folder required");
-        eprintln!("Help: draven -help");
-        process::exit(1);
+        }
     }
 
     let src_dir = PathBuf::from(src_dir);
     let mut output_dir = PathBuf::from(output_dir);
-
     output_dir.push("draven_generated");
 
-    fs::create_dir_all(&output_dir)?;
-    clean_markdown_in_directory(&output_dir)?;
-    traverse_directory(&src_dir, &output_dir)?;
-    if !silent {
-        println!("Markdown files generated");
-    }
+    work(&src_dir, &output_dir, silent)?;
 
     if watching {
         loop {
-            if let Err(error) = watch(&src_dir, &output_dir, silent) {
-                eprintln!("Error: {:?}", error);
-                std::process::exit(1);
-            }
+            watch(&src_dir, &output_dir, silent)?
         }
     }
 
@@ -65,6 +45,22 @@ fn print_help() {
     println!("-i <folder>: location to get rust project from");
     println!("-s: Silent mode");
     process::exit(0);
+}
+
+fn work<P: AsRef<Path>>(
+    src_dir: P,
+    output_dir: &PathBuf,
+    silent: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if output_dir.exists() {
+        fs::remove_dir_all(output_dir)?;
+    }
+    fs::create_dir_all(output_dir)?;
+    traverse_directory(&src_dir, output_dir)?;
+    if !silent {
+        println!("Markdown files generated");
+    }
+    Ok(())
 }
 
 fn verify_folder(
@@ -93,7 +89,7 @@ fn watch<P: AsRef<Path>>(
     watcher.watch(src_dir.as_ref(), RecursiveMode::Recursive)?;
 
     if !silent {
-        println!("Watching for changes in {:?}...", src_dir.as_ref());
+        println!("Now watching for file changes in {:?}...", src_dir.as_ref());
     }
 
     for res in rx {
@@ -102,40 +98,15 @@ fn watch<P: AsRef<Path>>(
                 if let Some(path) = event.paths.first() {
                     if let Some(extension) = path.extension() {
                         if extension == "rs" {
-                            if !silent {
-                                println!("Regenerating markdown files...");
-                            }
-                            fs::create_dir_all(&output_dir)?;
-                            clean_markdown_in_directory(&output_dir)?;
-                            return traverse_directory(src_dir, &output_dir);
+                            return work(&src_dir, output_dir, silent);
                         }
                     }
                 }
             }
-            Err(error) => {
-                eprintln!("Error: {:?}", error);
-                return Err(error.into());
-            }
+            Err(error) => Err(error)?,
         }
     }
 
-    Ok(())
-}
-
-fn clean_markdown_in_directory<P: AsRef<Path>>(
-    output_dir: P,
-) -> Result<(), Box<dyn std::error::Error>> {
-    for entry in fs::read_dir(output_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(extension) = path.extension() {
-                if extension == "md" {
-                    fs::remove_file(&path)?;
-                }
-            }
-        }
-    }
     Ok(())
 }
 
@@ -159,7 +130,7 @@ fn traverse_directory<P: AsRef<Path>>(
 
 fn parse_and_convert_to_markdown<P: AsRef<Path>>(
     path: P,
-    output_dir: &PathBuf,
+    output_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let content = fs::read_to_string(&path)?;
     let syntax_res = syn::parse_file(&content);
