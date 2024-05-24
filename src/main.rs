@@ -150,13 +150,14 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                         .as_ref()
                         .map(|ident| ident.to_string())
                         .unwrap_or_else(|| "unnamed_field".to_string());
-                    let type_name = type_path
+                    let type_path = type_path
                         .path
                         .segments
-                        .last()
-                        .map(|s| s.ident.to_string())
-                        .unwrap_or_else(|| "unnamed_type".to_string());
-                    markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_name));
+                        .iter()
+                        .map(|segment| segment.ident.to_string())
+                        .collect::<Vec<_>>()
+                        .join("::");
+                    markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_path));
                 }
             }
 
