@@ -153,15 +153,13 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
             let mut markdown = format!("# {}\n\n", struct_name);
             markdown.push_str("## name: Type\n\n");
             for field in s.fields {
-                if let syn::Type::Path(type_path) = &field.ty {
-                    let field_name = field
-                        .ident
-                        .as_ref()
-                        .map(|ident| ident.to_string())
-                        .unwrap_or_else(|| "unnamed_field".to_string());
-                    let type_name = resolve_type_path(type_path, &import_map);
-                    markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_name));
-                }
+                let field_name = field
+                    .ident
+                    .as_ref()
+                    .map(|ident| ident.to_string())
+                    .unwrap_or_else(|| "unnamed_field".to_string());
+                let type_name = resolve_full_type_path(&field.ty, &import_map);
+                markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_name));
             }
 
             let output_file = output_dir.join(format!("{}.md", struct_name));
@@ -198,9 +196,7 @@ fn parse_use_tree(tree: &UseTree, import_map: &mut HashMap<String, String>, pref
             };
             import_map.insert(rename.rename.to_string(), full_path);
         }
-        UseTree::Glob(_glob) => {
-            // Skip glob imports
-        }
+        UseTree::Glob(_glob) => {}
         UseTree::Group(group) => {
             for tree in &group.items {
                 parse_use_tree(tree, import_map, prefix.clone());
@@ -209,24 +205,40 @@ fn parse_use_tree(tree: &UseTree, import_map: &mut HashMap<String, String>, pref
     }
 }
 
-fn resolve_type_path(type_path: &syn::TypePath, import_map: &HashMap<String, String>) -> String {
-    let segments = &type_path.path.segments;
-    if let Some(first_segment) = segments.first() {
-        if let Some(full_path) = import_map.get(&first_segment.ident.to_string()) {
-            return format!(
-                "{}{}",
-                full_path,
-                segments
-                    .iter()
-                    .skip(1)
-                    .map(|segment| format!("::{}", segment.ident))
-                    .collect::<String>()
-            );
+fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) -> String {
+    match ty {
+        syn::Type::Path(type_path) => {
+            let segments = &type_path.path.segments;
+            if let Some(first_segment) = segments.first() {
+                if let Some(full_path) = import_map.get(&first_segment.ident.to_string()) {
+                    return format!(
+                        "{}{}",
+                        full_path,
+                        segments
+                            .iter()
+                            .skip(1)
+                            .map(|segment| format!("::{}", segment.ident))
+                            .collect::<String>()
+                    );
+                }
+            }
+            segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::")
         }
+        syn::Type::Array(type_array) => resolve_full_type_path(&type_array.elem, import_map),
+        syn::Type::Reference(type_reference) => {
+            resolve_full_type_path(&type_reference.elem, import_map)
+        }
+        syn::Type::Slice(type_slice) => resolve_full_type_path(&type_slice.elem, import_map),
+        syn::Type::Tuple(type_tuple) => type_tuple
+            .elems
+            .iter()
+            .map(|elem| resolve_full_type_path(elem, import_map))
+            .collect::<Vec<_>>()
+            .join(", "),
+        _ => "unknown".to_string(),
     }
-    segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect::<Vec<_>>()
-        .join("::")
 }
