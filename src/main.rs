@@ -1,9 +1,10 @@
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{env, process};
 use std::{fs, path::Path};
-use syn::Item;
+use syn::{Item, ItemUse, UseTree};
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -138,6 +139,14 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
         return Ok(());
     }
     let syntax = syntax_res?;
+
+    let mut import_map = HashMap::new();
+    for item in &syntax.items {
+        if let Item::Use(ItemUse { tree, .. }) = item {
+            parse_use_tree(tree, &mut import_map, String::new());
+        }
+    }
+
     for item in syntax.items {
         if let Item::Struct(s) = item {
             let struct_name = s.ident.to_string();
@@ -150,14 +159,8 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                         .as_ref()
                         .map(|ident| ident.to_string())
                         .unwrap_or_else(|| "unnamed_field".to_string());
-                    let type_path = type_path
-                        .path
-                        .segments
-                        .iter()
-                        .map(|segment| segment.ident.to_string())
-                        .collect::<Vec<_>>()
-                        .join("::");
-                    markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_path));
+                    let type_name = resolve_type_path(type_path, &import_map);
+                    markdown.push_str(&format!("{} : [[{}]]\n", field_name, type_name));
                 }
             }
 
@@ -167,4 +170,63 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
         }
     }
     Ok(())
+}
+
+fn parse_use_tree(tree: &UseTree, import_map: &mut HashMap<String, String>, prefix: String) {
+    match tree {
+        UseTree::Path(path) => {
+            let new_prefix = if prefix.is_empty() {
+                path.ident.to_string()
+            } else {
+                format!("{}::{}", prefix, path.ident)
+            };
+            parse_use_tree(&path.tree, import_map, new_prefix);
+        }
+        UseTree::Name(name) => {
+            let full_path = if prefix.is_empty() {
+                name.ident.to_string()
+            } else {
+                format!("{}::{}", prefix, name.ident)
+            };
+            import_map.insert(name.ident.to_string(), full_path);
+        }
+        UseTree::Rename(rename) => {
+            let full_path = if prefix.is_empty() {
+                rename.ident.to_string()
+            } else {
+                format!("{}::{}", prefix, rename.ident)
+            };
+            import_map.insert(rename.rename.to_string(), full_path);
+        }
+        UseTree::Glob(_glob) => {
+            // Skip glob imports
+        }
+        UseTree::Group(group) => {
+            for tree in &group.items {
+                parse_use_tree(tree, import_map, prefix.clone());
+            }
+        }
+    }
+}
+
+fn resolve_type_path(type_path: &syn::TypePath, import_map: &HashMap<String, String>) -> String {
+    let segments = &type_path.path.segments;
+    if let Some(first_segment) = segments.first() {
+        if let Some(full_path) = import_map.get(&first_segment.ident.to_string()) {
+            return format!(
+                "{}{}",
+                full_path,
+                segments
+                    .iter()
+                    .skip(1)
+                    .map(|segment| format!("::{}", segment.ident))
+                    .collect::<String>()
+            );
+        }
+    }
+    segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::")
 }
