@@ -1,6 +1,6 @@
 [package]
 name = "draven"
-version = "2.0.4"
+version = "2.1.0"
 edition = "2021"
 description = "draven creates obsidian graph files from a rust project structs in real time"
 repository = "https://github.com/AuracleTech/draven"
