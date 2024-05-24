@@ -1,5 +1,6 @@
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::io::Write;
+use std::path::PathBuf;
 use std::{env, process};
 use std::{fs, path::Path};
 use syn::Item;
@@ -62,6 +63,11 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(1);
     }
 
+    let src_dir = PathBuf::from(src_dir);
+    let mut output_dir = PathBuf::from(output_dir);
+
+    output_dir.push("draven_generated");
+
     fs::create_dir_all(&output_dir)?;
     clean_markdown_in_directory(&output_dir)?;
     traverse_directory(&src_dir, &output_dir)?;
@@ -96,7 +102,7 @@ fn verify_folder(folder: String) -> String {
 
 fn watch<P: AsRef<Path>>(
     src_dir: P,
-    output_dir: &str,
+    output_dir: &PathBuf,
     silent: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) = std::sync::mpsc::channel();
@@ -153,7 +159,7 @@ fn clean_markdown_in_directory<P: AsRef<Path>>(
 
 fn traverse_directory<P: AsRef<Path>>(
     src_dir: P,
-    output_dir: &str,
+    output_dir: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for entry in fs::read_dir(src_dir)? {
         let entry = entry?;
@@ -171,7 +177,7 @@ fn traverse_directory<P: AsRef<Path>>(
 
 fn parse_and_convert_to_markdown<P: AsRef<Path>>(
     path: P,
-    output_dir: &str,
+    output_dir: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let content = fs::read_to_string(&path)?;
     let syntax_res = syn::parse_file(&content);
@@ -201,8 +207,8 @@ fn parse_and_convert_to_markdown<P: AsRef<Path>>(
                 }
             }
 
-            let file_path = format!("{}/{}.md", output_dir, struct_name);
-            let mut file = fs::File::create(file_path)?;
+            let output_file = output_dir.join(format!("{}.md", struct_name));
+            let mut file = fs::File::create(output_file)?;
             file.write_all(markdown.as_bytes())?;
         }
     }
