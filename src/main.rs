@@ -1,32 +1,20 @@
+mod cli;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
+use std::error::Error;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{env, process};
 use std::{fs, path::Path};
 use syn::{Item, ItemUse, UseTree};
 
-pub fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().skip(1).collect();
-    let (mut src_dir, mut output_dir) = (String::new(), String::new());
-    let (mut watching, mut silent, mut primitives) = (false, false, false);
+pub fn main() -> Result<(), Box<dyn Error>> {
+    let draven = cli::DravenCLI::new()?;
 
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "-i" | "-input" | "--input" => src_dir = verify_folder(iter.next(), "-i")?,
-            "-o" | "-output" | "--output" => output_dir = verify_folder(iter.next(), "-o")?,
-            "-h" | "-help" | "--help" => print_help(),
-            "-w" | "-watch" | "--watch" => watching = true,
-            "-p" | "-primitives" | "--primitives" => primitives = true,
-            "-s" | "-silent" | "--silent" => silent = true,
-            _ => Err(format!("Unknown argument: {}", arg))?,
-        }
-    }
-
-    let src_dir = PathBuf::from(src_dir);
-    let mut output_dir = PathBuf::from(output_dir);
-    output_dir.push("draven_generated");
+    let src_dir = draven.input;
+    let output_dir = draven.output;
+    let watching = draven.watching;
+    let silent = draven.silent;
+    let primitives = draven.primitives;
 
     work(&src_dir, &output_dir, silent, primitives)?;
 
@@ -37,17 +25,6 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-fn print_help() {
-    println!("Usage: draven -i <input_folder> -o <output_folder>");
-    println!("-i <folder>: location to get rust project from");
-    println!("-o <folder>: location to write markdown files to");
-    println!("-h: Display help message");
-    println!("-w: Watches for file change in input folder");
-    println!("-p: Enable linking primitive types in markdown files");
-    println!("-s: Silent mode");
-    process::exit(0);
 }
 
 fn work<P: AsRef<Path>>(
@@ -65,21 +42,6 @@ fn work<P: AsRef<Path>>(
         println!("Markdown files generated");
     }
     Ok(())
-}
-
-fn verify_folder(
-    folder: Option<&String>,
-    flag: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
-    if let Some(folder) = folder {
-        let path = Path::new(folder);
-        if path.exists() && path.is_dir() {
-            return Ok(folder.clone());
-        }
-        Err(format!("{:?} is not a valid folder", path).into())
-    } else {
-        Err(format!("Expected argument after {}", flag).into())
-    }
 }
 
 fn watch<P: AsRef<Path>>(
@@ -203,11 +165,12 @@ fn resolve_full_type_path(ty: &syn::Type, import_map: &HashMap<String, String>) 
             resolve_full_type_path(&type_slice.elem, import_map).to_string()
         }
         syn::Type::Tuple(type_tuple) => type_tuple
-                .elems
-                .iter()
-                .map(|elem| resolve_full_type_path(elem, import_map))
-                .collect::<Vec<_>>()
-                .join(", ").to_string(),
+            .elems
+            .iter()
+            .map(|elem| resolve_full_type_path(elem, import_map))
+            .collect::<Vec<_>>()
+            .join(", ")
+            .to_string(),
         _ => "unknown".to_string(),
     }
 }
