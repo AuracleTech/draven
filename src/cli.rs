@@ -26,10 +26,10 @@ impl Draven {
         let input = input.ok_or("No input -i folder provided")?;
         let mut output = output.ok_or("No output -o folder provided")?;
 
-        if !input.exists() {
+        if !input.exists() && input.is_dir() {
             Err("Input folder does not exist")?;
         }
-        if !output.exists() {
+        if !output.exists() && output.is_dir() {
             Err("Output folder does not exist")?;
         }
         output.push("draven_generated");
