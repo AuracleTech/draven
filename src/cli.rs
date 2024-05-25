@@ -1,14 +1,7 @@
+use super::Draven;
 use std::{env, error::Error, path::PathBuf, process};
 
-pub struct DravenCLI {
-    pub input: PathBuf,
-    pub output: PathBuf,
-    pub watching: bool,
-    pub silent: bool,
-    pub primitives: bool,
-}
-
-impl DravenCLI {
+impl Draven {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         let mut input = None;
         let mut output = None;

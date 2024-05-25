@@ -7,8 +7,17 @@ use std::path::PathBuf;
 use std::{fs, path::Path};
 use syn::{Item, ItemUse, UseTree};
 
+pub struct Draven {
+    pub input: PathBuf,
+    pub output: PathBuf,
+    pub watching: bool,
+    pub silent: bool,
+    pub primitives: bool,
+}
+
 pub fn main() -> Result<(), Box<dyn Error>> {
-    let draven = cli::DravenCLI::new()?;
+    let draven = Draven::new()?;
+    // draven.parse_input()?;
 
     let src_dir = draven.input;
     let output_dir = draven.output;
