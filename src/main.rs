@@ -1,5 +1,7 @@
 mod cli;
+mod parser;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use parser::Node;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::Write;
@@ -13,6 +15,8 @@ pub struct Draven {
     pub watching: bool,
     pub silent: bool,
     pub primitives: bool,
+
+    pub nodes: Vec<Node>,
 }
 
 pub fn main() -> Result<(), Box<dyn Error>> {
