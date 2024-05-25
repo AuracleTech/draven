@@ -49,7 +49,6 @@ fn work<P: AsRef<Path>>(
     if output_dir.exists() {
         fs::remove_dir_all(output_dir)?;
     }
-    fs::create_dir_all(output_dir)?;
     traverse_directory(&src_dir, output_dir, primitives)?;
     if !silent {
         println!("Markdown files generated");
