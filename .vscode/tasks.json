@@ -10,7 +10,7 @@
 				"-i",
 				"C:/Users/DREAD/Desktop/nhope/src",
 				"-o",
-				"C:/Users/DREAD/Downloads/Viktor"
+				"C:/Users/DREAD/Desktop/nhope/obsidian"
 			],
 			"dependsOn": ["build executable"],
 			"problemMatcher": [],
