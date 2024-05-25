@@ -47,7 +47,13 @@ fn work<P: AsRef<Path>>(
     primitives: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if output_dir.exists() {
-        fs::remove_dir_all(output_dir)?;
+        for entry in fs::read_dir(&output_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                fs::remove_file(&path)?;
+            }
+        }
     }
     traverse_directory(&src_dir, output_dir, primitives)?;
     if !silent {
