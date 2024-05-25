@@ -20,8 +20,8 @@ impl DravenCLI {
         let mut iter = args.iter();
         while let Some(arg) = iter.next() {
             match arg.as_str() {
-                "-i" => input = iter.next().map(|s| PathBuf::from(s)),
-                "-o" => output = iter.next().map(|s| PathBuf::from(s)),
+                "-i" => input = iter.next().map(PathBuf::from),
+                "-o" => output = iter.next().map(PathBuf::from),
                 "-h" => print_help(),
                 "-w" => watching = true,
                 "-p" => primitives = true,
