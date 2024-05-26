@@ -3,12 +3,13 @@
 	"tasks": [
 		{
 			"label": "run executable",
-			"type": "shell",
-			"command": "${workspaceFolder}\\target\\release\\draven.exe",
+			"type": "cargo",
+			"command": "run",
 			"args": [
-				"-w",
+				"--",
+				"-r",
 				"-i",
-				"C:/Users/DREAD/Desktop/nhope/src",
+				"C:/Users/DREAD/Desktop/nhope/src/vulkan/surface_resources.rs",
 				"-o",
 				"C:/Users/DREAD/Desktop/nhope/obsidian"
 			],
