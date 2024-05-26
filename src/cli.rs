@@ -1,38 +1,47 @@
 use super::Draven;
+use notify::RecursiveMode;
 use std::{env, error::Error, fs, path::PathBuf, process};
 
 impl Draven {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         let mut input = None;
-        let mut output = None;
+        let mut vault = None;
         let mut watching = false;
         let mut silent = false;
         let mut primitives = false;
+        let mut recursive = RecursiveMode::NonRecursive;
 
         let args: Vec<String> = env::args().skip(1).collect();
         let mut iter = args.iter();
         while let Some(arg) = iter.next() {
             match arg.as_str() {
                 "-i" => input = iter.next().map(PathBuf::from),
-                "-o" => output = iter.next().map(PathBuf::from),
-                "-h" => print_help(),
+                "-o" => vault = iter.next().map(PathBuf::from),
+                "-h" => help(),
                 "-w" => watching = true,
                 "-p" => primitives = true,
                 "-s" => silent = true,
+                "-r" => recursive = RecursiveMode::Recursive,
                 _ => Err(format!("Unknown argument: {}", arg))?,
             }
         }
 
         let input = input.ok_or("No input -i folder provided")?;
-        let mut output = output.ok_or("No output -o folder provided")?;
+        let vault = vault.ok_or("No output -o folder provided")?;
 
         if !input.exists() && input.is_dir() {
             Err("Input folder does not exist")?;
         }
-        if !output.exists() && output.is_dir() {
+        if !vault.exists() && vault.is_dir() {
             Err("Output folder does not exist")?;
         }
-        output.push("draven_generated");
+
+        let output = vault.join("draven");
+
+        if output.exists() {
+            fs::remove_dir_all(&output)?;
+        }
+
         fs::create_dir_all(&output)?;
 
         Ok(Self {
@@ -41,20 +50,23 @@ impl Draven {
             watching,
             silent,
             primitives,
+            recursive,
 
-            nodes: Vec::new(),
+            structs: Default::default(),
+            functions: Default::default(),
         })
     }
 }
 
-fn print_help() {
-    println!(
-        r#"Usage: draven -i <input_folder> -o <output_folder>
--i <folder>: location to get rust project from
--o <folder>: location to write markdown files to
+fn help() {
+    log::info!(
+        r#"Usage: draven -i <rust_src_path> -o <obsidian_vault_path>
 -h: Display help message
--w: Watches for file change in input folder
--p: Enable linking primitive types in markdown files
+-i <src_path>: location to get rust project src from
+-o <vault_path>: location to write the obsidian files to
+-w: Watches for file change in real time to update obsidian files
+-r: Enable recursive folder processing in input folder
+-p: Enable primitive types linking in markdown files
 -s: Silent mode"#
     );
     process::exit(0);
