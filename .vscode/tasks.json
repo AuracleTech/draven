@@ -2,31 +2,40 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "run executable",
-			"type": "cargo",
-			"command": "run",
+			"label": "build release",
+			"type": "shell",
+			"command": "cargo",
+			"args": ["build", "--release"],
+			"group": "build",
+			"problemMatcher": ["$rustc"]
+		},
+		{
+			"label": "run cli",
+			"type": "shell",
+			"command": "cargo",
 			"args": [
+				"run",
 				"--",
-				"-r",
+				"-e",
+				"lib.rs",
 				"-i",
-				"C:/Users/DREAD/Desktop/nhope/src/vulkan/surface_resources.rs",
+				"C:/Users/Silco/Desktop/pulsar",
 				"-o",
-				"C:/Users/DREAD/Desktop/nhope/obsidian"
+				"C:/Users/Silco/Desktop/draven/generated"
 			],
-			"dependsOn": ["build executable"],
-			"problemMatcher": [],
+			"problemMatcher": ["$rustc"],
+			"group": "build"
+		},
+		{
+			"label": "run example",
+			"type": "shell",
+			"command": "cargo",
+			"args": ["run", "--example", "example"],
+			"problemMatcher": ["$rustc"],
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			}
-		},
-		{
-			"label": "build executable",
-			"type": "cargo",
-			"command": "build",
-			"args": ["--release"],
-			"group": "build",
-			"problemMatcher": ["$rustc"]
 		}
 	]
 }
