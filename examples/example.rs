@@ -1,49 +1,22 @@
 use draven::parser::{self};
+use log::debug;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
-    env,
     error::Error,
-    fs::{self, File},
+    fs::{self},
     io::Write,
     path::PathBuf,
-    process,
 };
 use toml::Value;
 
 pub fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
-    let mut rust_project = None;
-    let mut output = None;
-    let mut watching = false;
-    let mut entry = "main.rs";
-
-    let args: Vec<String> = env::args().skip(1).collect();
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "-i" => rust_project = iter.next().map(PathBuf::from),
-            "-o" => output = iter.next().map(PathBuf::from),
-            "-w" => watching = true,
-            "-e" => entry = iter.next().ok_or("No entry after -e")?,
-            "-h" => {
-                log::info!(
-                    r#"Usage: draven -i <rust_src_path> -o <obsidian_vault_path>
--i <src_path>: location to get rust project src from
--o <vault_path>: location to write the obsidian files to
--w: Watches for file change in real time to update obsidian files
--p: Enable primitive types linking in markdown files
--e <entry_file>: Entry file to start parsing from
--h: Display help message"#
-                );
-                process::exit(0);
-            }
-            _ => Err(format!("Unknown argument: {}", arg))?,
-        }
-    }
-
-    let rust_project = rust_project.ok_or("No input -i folder provided")?;
-    let output = output.ok_or("No output -o folder provided")?;
+    let rust_project = PathBuf::from("C:/Users/Silco/Desktop/pulsar");
+    let output = PathBuf::from("C:/Users/Silco/Desktop/draven/generated");
+    let watching = false;
+    let primitives = false;
+    let entry = "lib.rs";
 
     if !rust_project.exists() {
         Err("Input folder does not exist")?;
@@ -81,6 +54,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         .get("name")
         .ok_or("Failed to find name field in [package] from Cargo.toml")?;
     let package_name = package_name.to_string();
+    let package_name = package_name.trim_matches('"');
 
     loop {
         log::info!("Parsing project: {}", package_name);
@@ -98,9 +72,15 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         let mut file_new = parser::File::new(project_src_entry_stem, project_src_entry_folder);
         file_new.parse()?;
 
+        if !primitives {
+            // IMPLEMENT iterate over module to remove primitives
+        }
+
         let filename = format!("{}.md", package_name);
         let output = output.join(filename);
-        let mut file = File::create(output)?;
+        debug!("Writing to {:?}", output);
+
+        let mut file = fs::File::create(output)?;
         writeln!(file, "{}", file_new)?;
 
         if watching {

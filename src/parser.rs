@@ -1,227 +1,144 @@
-use crate::Draven;
-use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use log::debug;
+use quote::ToTokens;
 use std::{
     collections::HashMap,
     error::Error,
     fmt::Debug,
-    fs::{self, File},
-    io::Write,
-    path::Path,
+    fs,
+    path::{Path, PathBuf},
 };
 use syn::{Fields, Item, UseTree};
 
 #[derive(Debug)]
 pub struct TypeAlias {
-    alias: String,
-    type_name: String,
-}
-
-impl Node for TypeAlias {
-    fn filename(&self) -> String {
-        self.type_name.clone()
-    }
-
-    fn print(&self) -> String {
-        let mut output = String::new();
-        output.push_str(&format!("{}: [[{}]]\n", self.alias, self.type_name));
-        output
-    }
+    pub alias: String,
+    pub type_name: String,
 }
 
 #[derive(Debug)]
 pub struct Struct {
-    type_name: String,
-    fields: Vec<TypeAlias>,
-    methods: Vec<Function>,
-}
-
-impl Node for Struct {
-    fn filename(&self) -> String {
-        self.type_name.clone()
-    }
-
-    fn print(&self) -> String {
-        let mut output = String::from("#Struct\n\n");
-        for field in &self.fields {
-            output.push_str(&field.print());
-        }
-
-        output.push_str("\nMethods\n");
-
-        for method in &self.methods {
-            output.push_str(format!("[[{}]]\n", method.name).as_str());
-        }
-        output
-    }
+    pub type_name: String,
+    pub fields: Vec<TypeAlias>,
+    pub methods: HashMap<String, Function>,
 }
 
 #[derive(Debug)]
 pub struct Enum {
-    type_name: String,
-    variants: Vec<String>,
-}
-
-impl Node for Enum {
-    fn filename(&self) -> String {
-        self.type_name.clone()
-    }
-
-    fn print(&self) -> String {
-        let mut output = String::from("#Enum\n\n");
-        for variant in &self.variants {
-            output.push_str(&format!("[[{}]]\n", variant));
-        }
-        output
-    }
+    pub name: String,
+    pub variants: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct Function {
-    name: String,
-    args: Vec<TypeAlias>,
+    pub name: String,
+    pub args: Vec<TypeAlias>,
 }
 
-impl Node for Function {
-    fn filename(&self) -> String {
-        self.name.clone()
-    }
+#[derive(Debug)]
+pub struct Constant {
+    pub name: String,
+    pub type_name: String,
+    pub value: String,
+}
 
-    fn print(&self) -> String {
-        let mut output = String::from("#Function\n\n");
-        for arg in &self.args {
-            output.push_str(&arg.print());
+#[derive(Debug)]
+pub struct Trait {
+    pub name: String,
+    pub functions: HashMap<String, Function>,
+}
+
+#[derive(Debug)]
+pub struct Macro {
+    pub name: String,
+    pub body: String,
+}
+
+#[derive(Debug)]
+pub struct Module {
+    pub name: String,
+    pub functions: HashMap<String, Function>,
+    pub structs: HashMap<String, Struct>,
+    pub enums: HashMap<String, Enum>,
+    pub traits: HashMap<String, Trait>,
+    pub constants: HashMap<String, Constant>,
+    pub macros: HashMap<String, Macro>,
+    pub imports: HashMap<String, String>,
+    pub submodules: HashMap<String, Module>,
+}
+
+impl Module {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            functions: HashMap::new(),
+            structs: HashMap::new(),
+            enums: HashMap::new(),
+            traits: HashMap::new(),
+            constants: HashMap::new(),
+            macros: HashMap::new(),
+            imports: HashMap::new(),
+            submodules: HashMap::new(),
         }
-        output
     }
 }
 
-pub trait Node {
-    fn filename(&self) -> String;
-    fn print(&self) -> String;
-    fn generate_markdown(&self, output: &Path) -> Result<(), Box<dyn Error>> {
-        let filename = format!("{}.md", self.filename());
-        let output = output.join(filename);
-        let mut file = File::create(output)?;
-        writeln!(file, "{}", self.print())?;
-        Ok(())
-    }
+#[derive(Debug)]
+pub struct File {
+    pub folder: PathBuf,
+    pub file_stem: String,
+    pub modules: HashMap<String, Module>,
 }
 
-impl Draven {
-    pub fn watch(&mut self) -> Result<(), Box<dyn Error>> {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
-        watcher.watch(self.input.as_path(), self.recursive)?;
-
-        if !self.silent {
-            log::info!("Watching for file changes in {:?}...", self.input);
+impl File {
+    pub fn new(file_stem: String, folder: PathBuf) -> Self {
+        Self {
+            folder,
+            file_stem,
+            modules: HashMap::new(),
         }
-
-        for result in rx {
-            match result {
-                Ok(event) => {
-                    if let Some(path) = event.paths.first() {
-                        if let Some(extension) = path.extension() {
-                            if extension == "rs" {
-                                return self.parse_path(self.input.clone().as_path());
-                            }
-                        }
-                    }
-                }
-                Err(error) => Err(error)?,
-            }
-        }
-
-        Ok(())
     }
 
-    pub fn parse_path(&mut self, path: &Path) -> Result<(), Box<dyn Error>> {
-        if path.is_dir() {
-            for entry in fs::read_dir(path)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_dir() && self.recursive == RecursiveMode::Recursive {
-                    self.parse_path(&path)?;
-                } else {
-                    self.parse_file(&path)?;
-                }
-            }
-        } else {
-            self.parse_file(path)?;
-        }
-
-        self.markdowns()?;
-
-        Ok(())
-    }
-
-    fn parse_file(&mut self, path: &Path) -> Result<(), Box<dyn Error>> {
-        let content = fs::read_to_string(path)?;
+    pub fn parse(&mut self) -> Result<(), Box<dyn Error>> {
+        let fullpath = self.folder.join(&self.file_stem).with_extension("rs");
+        debug!("File::parse({:?})", fullpath);
+        let content = fs::read_to_string(fullpath)?;
         let syntax = syn::parse_file(&content)?;
 
-        let mut imports = HashMap::new();
+        let mut root_module = Module::new(self.file_stem.clone());
 
         for item in syntax.items {
-            self.parse_item(item, &mut imports)?;
+            File::parse_item(&mut root_module, item, &self.folder)?;
         }
 
+        self.modules.insert(root_module.name.clone(), root_module);
         Ok(())
     }
 
-    fn parse_item(
-        &mut self,
-        item: Item,
-        imports: &mut HashMap<String, String>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn parse_item(module: &mut Module, item: Item, base_path: &Path) -> Result<(), Box<dyn Error>> {
         match item {
-            Item::Use(item_use) => Self::parse_use_tree(&item_use.tree, String::new(), imports),
-            Item::Struct(item_struct) => self.parse_struct(item_struct),
-            Item::Fn(item_fn) => self.parse_function(item_fn),
-            Item::Impl(item_impl) => self.parse_impl(item_impl),
+            Item::Use(item_use) => File::parse_use_tree(&item_use.tree, String::new(), module)?,
+            Item::Struct(item_struct) => module.parse_struct(item_struct)?,
+            Item::Fn(item_fn) => module.parse_function(item_fn)?,
+            Item::Impl(item_impl) => module.parse_impl(item_impl)?,
+            Item::Enum(item_enum) => module.parse_enum(item_enum)?,
+            Item::Const(item_const) => module.parse_constant(item_const)?,
+            Item::Type(item_type) => module.parse_type_alias(item_type)?,
+            Item::Mod(item_mod) => {
+                module.parse_submodule(item_mod, base_path, &module.name.clone())?
+            }
+            Item::Macro(item_macro) => module.parse_macro(item_macro)?,
+            Item::Trait(item_trait) => module.parse_trait(item_trait)?,
             _ => {
                 log::warn!("Unsupported syn item received: {:?}", item);
-                Ok(())
             }
         }
-    }
-
-    fn parse_struct<'b>(&mut self, item_struct: syn::ItemStruct) -> Result<(), Box<dyn Error>> {
-        let type_name = item_struct.ident.to_string();
-        let fields = self.parse_fields(&item_struct.fields)?;
-
-        let node = Struct {
-            type_name: type_name.clone(),
-            fields,
-            methods: Vec::new(),
-        };
-        self.structs.insert(type_name, node);
         Ok(())
-    }
-
-    fn parse_fields(&self, fields: &Fields) -> Result<Vec<TypeAlias>, Box<dyn Error>> {
-        let mut field_nodes = Vec::new();
-        for field in fields {
-            let alias = match &field.ident {
-                Some(ident) => ident.to_string(),
-                None => "".to_string(), // Handle tuple struct fields which have no names
-            };
-
-            let type_name = match &field.ty {
-                syn::Type::Path(ref type_path) => {
-                    type_path.path.segments.last().unwrap().ident.to_string()
-                }
-                _ => "".to_string(),
-            };
-
-            field_nodes.push(TypeAlias { alias, type_name });
-        }
-        Ok(field_nodes)
     }
 
     fn parse_use_tree(
         tree: &UseTree,
         prefix: String,
-        imports: &mut HashMap<String, String>,
+        module: &mut Module,
     ) -> Result<(), Box<dyn Error>> {
         match tree {
             UseTree::Path(use_path) => {
@@ -230,7 +147,7 @@ impl Draven {
                 } else {
                     format!("{}::{}", prefix, use_path.ident)
                 };
-                Self::parse_use_tree(&use_path.tree, new_prefix, imports)?;
+                File::parse_use_tree(&use_path.tree, new_prefix, module)?;
             }
             UseTree::Name(use_name) => {
                 let full_path = if prefix.is_empty() {
@@ -238,16 +155,56 @@ impl Draven {
                 } else {
                     format!("{}::{}", prefix, use_name.ident)
                 };
-                imports.insert(use_name.ident.to_string(), full_path);
+                module.imports.insert(use_name.ident.to_string(), full_path);
             }
             UseTree::Group(use_group) => {
                 for item in &use_group.items {
-                    Self::parse_use_tree(item, prefix.clone(), imports)?;
+                    File::parse_use_tree(item, prefix.clone(), module)?;
                 }
             }
             _ => {}
         }
         Ok(())
+    }
+}
+
+impl Module {
+    fn parse_struct(&mut self, item_struct: syn::ItemStruct) -> Result<(), Box<dyn Error>> {
+        let fields = self.parse_fields(&item_struct.fields)?;
+
+        self.structs.insert(
+            item_struct.ident.to_string(),
+            Struct {
+                type_name: item_struct.ident.to_string(),
+                fields,
+                methods: HashMap::new(),
+            },
+        );
+        Ok(())
+    }
+
+    fn parse_fields(&self, fields: &Fields) -> Result<Vec<TypeAlias>, Box<dyn Error>> {
+        let mut type_alias_list = Vec::new();
+        for field in fields {
+            let alias = match &field.ident {
+                Some(ident) => ident.to_string(),
+                None => "".to_string(),
+            };
+
+            let type_name = match &field.ty {
+                syn::Type::Path(ref type_path) => type_path
+                    .path
+                    .segments
+                    .last()
+                    .expect("Failed to get last segment")
+                    .ident
+                    .to_string(),
+                _ => "".to_string(),
+            };
+
+            type_alias_list.push(TypeAlias { alias, type_name });
+        }
+        Ok(type_alias_list)
     }
 
     fn parse_function(&mut self, item_fn: syn::ItemFn) -> Result<(), Box<dyn Error>> {
@@ -265,10 +222,12 @@ impl Draven {
                     _ => "".to_string(),
                 };
 
-                TypeAlias {
-                    alias,
-                    type_name: name.clone(),
-                }
+                let type_name = match fn_arg {
+                    syn::FnArg::Typed(pat_type) => pat_type.ty.to_token_stream().to_string(),
+                    _ => "".to_string(),
+                };
+
+                TypeAlias { alias, type_name }
             })
             .collect();
 
@@ -282,106 +241,254 @@ impl Draven {
 
     fn parse_impl(&mut self, item_impl: syn::ItemImpl) -> Result<(), Box<dyn Error>> {
         let parent = match *item_impl.self_ty {
-            syn::Type::Path(ref type_path) => {
-                type_path.path.segments.last().unwrap().ident.to_string()
-            }
+            syn::Type::Path(ref type_path) => type_path
+                .path
+                .segments
+                .last()
+                .expect("Failed to get last segment")
+                .ident
+                .to_string(),
             _ => return Err("Unsupported type in impl block".into()),
         };
+
+        if !self.structs.contains_key(&parent) {
+            log::warn!("Parent struct '{}' not found for impl block", parent);
+            return Ok(());
+        }
 
         for item in item_impl.items {
             self.parse_method(&item, &parent)?;
         }
-
-        // for item in item_impl.items {
-        //     if let syn::ImplItem::Fn(impl_item_fn) = item {
-        //         let type_name = impl_item_fn.sig.ident.to_string();
-        //         let args = impl_item_fn
-        //             .sig
-        //             .inputs
-        //             .iter()
-        //             .map(|fn_arg| {
-        //                 let alias = match fn_arg {
-        //                     syn::FnArg::Typed(pat_type) => match &*pat_type.ty {
-        //                         syn::Type::Path(ref type_path) => {
-        //                             type_path.path.segments.last().unwrap().ident.to_string()
-        //                         }
-        //                         _ => "".to_string(),
-        //                     },
-        //                     _ => "".to_string(),
-        //                 };
-
-        //                 TypeAlias {
-        //                     alias,
-        //                     type_name: type_name.clone(),
-        //                 }
-        //             })
-        //             .collect();
-
-        //         Node {
-        //             title: type_name,
-        //             kind: NodeKind::Method {
-        //                 parent: parent.clone(),
-        //                 args,
-        //             },
-        //         };
-        //     }
-        // }
 
         Ok(())
     }
 
     fn parse_method(&mut self, item: &syn::ImplItem, parent: &str) -> Result<(), Box<dyn Error>> {
         if let syn::ImplItem::Fn(impl_item_method) = item {
-            let type_name = impl_item_method.sig.ident.to_string();
+            let name = impl_item_method.sig.ident.to_string();
             let args = impl_item_method
                 .sig
                 .inputs
                 .iter()
                 .map(|fn_arg| {
                     let alias = match fn_arg {
-                        syn::FnArg::Typed(pat_type) => match &*pat_type.ty {
-                            syn::Type::Path(ref type_path) => {
-                                type_path.path.segments.last().unwrap().ident.to_string()
-                            }
+                        syn::FnArg::Typed(pat_type) => match &*pat_type.pat {
+                            syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
                             _ => "".to_string(),
                         },
                         _ => "".to_string(),
                     };
 
-                    TypeAlias {
-                        alias,
-                        type_name: type_name.clone(),
-                    }
+                    let type_name = match fn_arg {
+                        syn::FnArg::Typed(pat_type) => pat_type.ty.to_token_stream().to_string(),
+                        _ => "".to_string(),
+                    };
+
+                    TypeAlias { alias, type_name }
                 })
                 .collect();
 
-            let structure = self.structs.get_mut(parent).unwrap();
-            let node = Function {
-                name: type_name,
-                args,
-            };
-            structure.methods.push(node);
-            Ok(())
-        } else {
-            Err("Unsupported type in impl block".into())
-        }
-    }
-
-    pub fn markdowns(&mut self) -> Result<(), Box<dyn Error>> {
-        for (_key, value) in &self.structs {
-            value.generate_markdown(&self.output)?;
-
-            for method in &value.methods {
-                method.generate_markdown(&self.output)?;
+            if let Some(structure) = self.structs.get_mut(parent) {
+                let node = Function {
+                    name: name.clone(),
+                    args,
+                };
+                structure.methods.insert(name, node);
+            } else {
+                log::warn!(
+                    "Failed to find parent struct '{}' for method '{}'",
+                    parent,
+                    name
+                );
             }
         }
-        for (_key, value) in &self.functions {
-            value.generate_markdown(&self.output)?;
+        Ok(())
+    }
+
+    fn parse_enum(&mut self, item_enum: syn::ItemEnum) -> Result<(), Box<dyn Error>> {
+        let type_name = item_enum.ident.to_string();
+        let variants = item_enum
+            .variants
+            .iter()
+            .map(|variant| variant.ident.to_string())
+            .collect();
+
+        let node = Enum {
+            name: type_name.clone(),
+            variants,
+        };
+        self.enums.insert(type_name, node);
+        Ok(())
+    }
+
+    fn parse_constant(&mut self, item_const: syn::ItemConst) -> Result<(), Box<dyn Error>> {
+        let name = item_const.ident.to_string();
+        let value = item_const.expr.to_token_stream().to_string();
+
+        let node = Constant {
+            name: name.clone(),
+            type_name: item_const.ty.to_token_stream().to_string(),
+            value,
+        };
+        self.constants.insert(name, node);
+        Ok(())
+    }
+
+    fn parse_type_alias(&mut self, item_type: syn::ItemType) -> Result<(), Box<dyn Error>> {
+        let alias = item_type.ident.to_string();
+        let type_name = item_type.ty.to_token_stream().to_string();
+
+        let node = TypeAlias { alias, type_name };
+
+        if let Some(parent) = self.structs.get_mut(&node.type_name) {
+            parent.fields.push(node);
+        } else {
+            log::warn!(
+                "Failed to find parent struct '{}' for type alias '{}'",
+                node.type_name,
+                node.alias
+            );
         }
 
-        self.structs.clear();
-        self.functions.clear();
+        Ok(())
+    }
 
+    fn parse_submodule(
+        &mut self,
+        item_mod: syn::ItemMod,
+        base_path: &Path,
+        parent: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let mod_name = item_mod.ident.to_string();
+
+        if let Some((_, content)) = item_mod.content {
+            debug!("Parsing inline submodule: {:?}", mod_name);
+            let mut submodule = Module {
+                name: mod_name.clone(),
+                functions: HashMap::new(),
+                structs: HashMap::new(),
+                enums: HashMap::new(),
+                traits: HashMap::new(),
+                constants: HashMap::new(),
+                macros: HashMap::new(),
+                submodules: HashMap::new(),
+                imports: HashMap::new(),
+            };
+
+            for item in content {
+                File::parse_item(&mut submodule, item, &base_path.join(&mod_name))?;
+            }
+
+            self.submodules.insert(mod_name, submodule);
+        } else {
+            let paths = [
+                base_path.join(&mod_name).with_extension("rs"),
+                base_path.join(&mod_name).join("mod.rs"),
+                base_path.join(parent).join(&mod_name).with_extension("rs"),
+                base_path.join(parent).join(&mod_name).join("mod.rs"),
+            ];
+
+            let submodule_file = paths
+                .iter()
+                .find_map(|path| {
+                    if path.exists() {
+                        debug!("Parsing file submodule: {:?}", path);
+                        let canonical_path = path.canonicalize().ok()?;
+
+                        let canonical_path_stem = canonical_path
+                            .file_stem()
+                            .expect("Failed to get path stem")
+                            .to_str()
+                            .expect("Failed to convert path stem to string")
+                            .to_string();
+                        let canonical_path_folder = canonical_path
+                            .parent()
+                            .expect("Failed to get parent folder")
+                            .to_path_buf();
+
+                        let mut file = File::new(canonical_path_stem, canonical_path_folder);
+                        file.parse().ok()?;
+                        Some(file)
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| format!("Submodule file not found for module '{}'", mod_name))?;
+
+            if let Some((_, module)) = submodule_file.modules.into_iter().next() {
+                self.submodules.insert(mod_name, module);
+            } else {
+                return Err(format!("Failed to parse submodule '{}'", mod_name).into());
+            }
+        }
+
+        Ok(())
+    }
+
+    fn parse_macro(&mut self, item_macro: syn::ItemMacro) -> Result<(), Box<dyn Error>> {
+        let name = item_macro
+            .mac
+            .path
+            .segments
+            .last()
+            .expect("Failed to get last segment")
+            .ident
+            .to_string();
+        let body = item_macro.mac.tokens.to_string();
+
+        let node = Macro {
+            name: name.clone(),
+            body,
+        };
+        self.macros.insert(name, node);
+        Ok(())
+    }
+
+    fn parse_trait(&mut self, item_trait: syn::ItemTrait) -> Result<(), Box<dyn Error>> {
+        let name = item_trait.ident.to_string();
+        let functions = item_trait
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let syn::TraitItem::Fn(method) = item {
+                    Some(Function {
+                        name: method.sig.ident.to_string(),
+                        args: method
+                            .sig
+                            .inputs
+                            .iter()
+                            .map(|fn_arg| {
+                                let alias = match fn_arg {
+                                    syn::FnArg::Typed(pat_type) => match &*pat_type.pat {
+                                        syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
+                                        _ => "".to_string(),
+                                    },
+                                    _ => "".to_string(),
+                                };
+
+                                let type_name = match fn_arg {
+                                    syn::FnArg::Typed(pat_type) => {
+                                        pat_type.ty.to_token_stream().to_string()
+                                    }
+                                    _ => "".to_string(),
+                                };
+
+                                TypeAlias { alias, type_name }
+                            })
+                            .collect(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .map(|function| (function.name.clone(), function))
+            .collect();
+
+        let node = Trait {
+            name: name.clone(),
+            functions,
+        };
+        self.traits.insert(name, node);
         Ok(())
     }
 }
