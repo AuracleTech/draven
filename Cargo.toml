@@ -1,11 +1,11 @@
 [package]
 name = "draven"
-version = "3.0.0"
+version = "4.0.0"
 edition = "2021"
-description = "draven creates obsidian graph files from a rust project structs in real time"
+description = "draven creates a visualization of a rust project's dependencies using jax"
 repository = "https://github.com/AuracleTech/draven"
 license = "MIT"
-keywords = ["cli", "draven", "obsidian", "graph", "rust"]
+keywords = ["cli", "draven", "jax", "graph", "rust"]
 categories = ["command-line-utilities"]
 
 [dependencies]
@@ -14,3 +14,4 @@ log = "0.4.21"
 notify = "6.1.1"
 quote = "1.0.36"
 syn = { version = "2.0.65", features = ["full", "extra-traits"] }
+toml = "0.8.13"
